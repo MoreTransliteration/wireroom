@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wire Room — Text Transcoder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDE6D3;
+    --paper-light:#F7F2E6;
+    --ink:#221D15;
+    --ink-soft:#6b6250;
+    --rule:#cabe9d;
+    --copper:#a85c2a;
+    --copper-dark:#7a3f18;
+    --signal:#b5432b;
+    --hole-off:#d8cfb4;
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(168,92,42,0.07), transparent),
+      var(--paper);
+    color:var(--ink);
+    font-family:'JetBrains Mono', monospace;
+    line-height:1.5;
+    padding:0 0 80px;
+  }
+  a{color:inherit;}
+
+  .wrap{max-width:920px;margin:0 auto;padding:0 24px;}
+
+  /* ---------- Header ---------- */
+  header{padding:56px 24px 28px;text-align:center;}
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--copper-dark);
+    font-weight:600;
+    margin-bottom:14px;
+  }
+  .eyebrow::before,.eyebrow::after{content:"—";margin:0 10px;color:var(--rule);}
+  h1{
+    font-family:'Special Elite', monospace;
+    font-size:clamp(40px, 8vw, 68px);
+    margin:0;
+    letter-spacing:0.02em;
+    color:var(--ink);
+  }
+  .sub{
+    color:var(--ink-soft);
+    font-size:14px;
+    max-width:520px;
+    margin:14px auto 0;
+  }
+
+  /* ---------- Punch tape (signature element) ---------- */
+  .tape-outer{
+    margin:36px 0 8px;
+    background:linear-gradient(180deg, #c9793f, var(--copper) 12%, var(--copper) 88%, #8a4a20);
+    border-radius:6px;
+    box-shadow:0 10px 24px -12px rgba(34,29,21,0.45), inset 0 1px 0 rgba(255,255,255,0.25);
+    overflow:hidden;
+    position:relative;
+  }
+  .tape-outer::before, .tape-outer::after{
+    content:"";
+    position:absolute;
+    left:0;right:0;
+    height:1px;
+    background:rgba(0,0,0,0.2);
+  }
+  .tape-outer::before{top:32%;}
+  .tape-outer::after{top:68%;}
+  .tape-label{
+    position:absolute;
+    top:4px; left:10px;
+    font-size:9px;
+    letter-spacing:0.15em;
+    color:rgba(255,255,255,0.65);
+    text-transform:uppercase;
+    z-index:2;
+  }
+  .tape-row{
+    display:flex;
+    gap:5px;
+    padding:22px 14px 12px;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .tape-row::-webkit-scrollbar{display:none;}
+  .tape-col{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    flex:0 0 auto;
+  }
+  .hole{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--hole-off);
+    opacity:0.35;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,0.3);
+    transition:opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  }
+  .hole.filled{
+    background:#2a2118;
+    opacity:1;
+    box-shadow:0 0 0 2px rgba(255,255,255,0.15), inset 0 1px 1px rgba(0,0,0,0.6);
+  }
+  .sprocket{
+    width:4px;height:4px;
+    margin:1px auto;
+    border-radius:50%;
+    background:rgba(0,0,0,0.35);
+  }
+
+  /* ---------- Mode toggle ---------- */
+  .mode-toggle{
+    display:flex;
+    justify-content:center;
+    gap:0;
+    margin:28px 0 30px;
+  }
+  .mode-toggle button{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    font-weight:600;
+    padding:10px 22px;
+    background:var(--paper-light);
+    color:var(--ink-soft);
+    border:1px solid var(--rule);
+    cursor:pointer;
+    transition:all 0.15s ease;
+  }
+  .mode-toggle button:first-child{border-radius:4px 0 0 4px;border-right:none;}
+  .mode-toggle button:last-child{border-radius:0 4px 4px 0;}
+  .mode-toggle button.active{
+    background:var(--ink);
+    color:var(--paper-light);
+    border-color:var(--ink);
+  }
+  .mode-toggle button:not(.active):hover{color:var(--ink);}
+  .mode-toggle button:focus-visible{outline:2px solid var(--copper);outline-offset:2px;}
+
+  /* ---------- Card / panel shell ---------- */
+  .panel{
+    background:var(--paper-light);
+    border:1px solid var(--rule);
+    border-radius:8px;
+    padding:24px;
+  }
+  .panel + .panel{margin-top:20px;}
+
+  label.field-label{
+    display:block;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--copper-dark);
+    font-weight:600;
+    margin-bottom:8px;
+  }
+
+  textarea, select{
+    width:100%;
+    font-family:'JetBrains Mono', monospace;
+    font-size:14.5px;
+    color:var(--ink);
+    background:#fff;
+    border:1px solid var(--rule);
+    border-radius:5px;
+    padding:12px 14px;
+    resize:vertical;
+  }
+  textarea:focus, select:focus{
+    outline:2px solid var(--copper);
+    outline-offset:1px;
+    border-color:var(--copper);
+  }
+  textarea#input-text{min-height:88px;}
+
+  .char-count{
+    text-align:right;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-top:6px;
+  }
+
+  /* ---------- Channel rows ---------- */
+  .channels{margin-top:22px;display:flex;flex-direction:column;gap:2px;}
+  .channel{
+    display:grid;
+    grid-template-columns:110px 1fr auto;
+    gap:14px;
+    align-items:start;
+    padding:14px 4px;
+    border-top:1px solid var(--rule);
+  }
+  .channel:first-child{border-top:none;}
+  .ch-label{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    padding-top:2px;
+  }
+  .ch-num{
+    font-size:10px;
+    color:var(--copper);
+    font-weight:700;
+  }
+  .ch-name{
+    font-size:12px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .ch-output{
+    font-size:14px;
+    word-break:break-all;
+    white-space:pre-wrap;
+    color:var(--ink);
+    min-height:20px;
+  }
+  .ch-output.braille{font-size:19px;letter-spacing:1px;}
+  .ch-output.empty{color:var(--ink-soft);font-style:italic;}
+  .copy-btn{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    background:transparent;
+    border:1px solid var(--rule);
+    color:var(--ink-soft);
+    padding:6px 10px;
+    border-radius:4px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:all 0.15s ease;
+  }
+  .copy-btn:hover{border-color:var(--copper);color:var(--copper-dark);}
+  .copy-btn.copied{background:var(--copper);border-color:var(--copper);color:#fff;}
+  .copy-btn:focus-visible{outline:2px solid var(--copper);outline-offset:2px;}
+
+  /* ---------- Decode panel ---------- */
+  .decode-grid{display:flex;flex-direction:column;gap:16px;}
+  .decode-row{display:flex;flex-direction:column;gap:8px;}
+  .decode-error{
+    font-size:12px;
+    color:var(--signal);
+    margin-top:6px;
+    display:none;
+  }
+  .decode-error.show{display:block;}
+  #decode-output{min-height:70px;background:#fff;}
+
+  .hidden{display:none;}
+
+  footer{
+    text-align:center;
+    margin-top:44px;
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:0.04em;
+  }
+
+  @media (max-width:560px){
+    .channel{grid-template-columns:1fr;gap:6px;}
+    .ch-label{padding-top:0;}
+    .copy-btn{justify-self:start;}
+    header{padding:40px 16px 20px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Live Transcoder</div>
+  <h1>Wire Room</h1>
+  <p class="sub">Type a message and watch it go out on every line at once — ASCII, binary, hex, base64, morse, and braille.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="tape-outer">
+    <div class="tape-label">Punch Tape · 5-bit</div>
+    <div class="tape-row" id="tape-row" aria-hidden="true"></div>
+  </div>
+
+  <div class="mode-toggle" role="tablist" aria-label="Transcoder mode">
+    <button id="btn-encode" class="active" role="tab" aria-selected="true">Encode</button>
+    <button id="btn-decode" role="tab" aria-selected="false">Decode</button>
+  </div>
+
+  <!-- ENCODE PANEL -->
+  <div id="encode-panel">
+    <div class="panel">
+      <label class="field-label" for="input-text">Message</label>
+      <textarea id="input-text" placeholder="Tap out your message..." autofocus></textarea>
+      <div class="char-count"><span id="char-count">0</span> characters</div>
+
+      <div class="channels">
+        <div class="channel">
+          <div class="ch-label"><span class="ch-num">01</span><span class="ch-name">ASCII</span></div>
+          <div class="ch-output empty" id="out-ascii">—</div>
+          <button class="copy-btn" data-target="out-ascii">Copy</button>
+        </div>
+        <div class="channel">
+          <div class="ch-label"><span class="ch-num">02</span><span class="ch-name">Binary</span></div>
+          <div class="ch-output empty" id="out-binary">—</div>
+          <button class="copy-btn" data-target="out-binary">Copy</button>
+        </div>
+        <div class="channel">
+          <div class="ch-label"><span class="ch-num">03</span><span class="ch-name">Hex</span></div>
+          <div class="ch-output empty" id="out-hex">—</div>
+          <button class="copy-btn" data-target="out-hex">Copy</button>
+        </div>
+        <div class="channel">
+          <div class="ch-label"><span class="ch-num">04</span><span class="ch-name">Base64</span></div>
+          <div class="ch-output empty" id="out-base64">—</div>
+          <button class="copy-btn" data-target="out-base64">Copy</button>
+        </div>
+        <div class="channel">
+          <div class="ch-label"><span class="ch-num">05</span><span class="ch-name">Morse</span></div>
+          <div class="ch-output empty" id="out-morse">—</div>
+          <button class="copy-btn" data-target="out-morse">Copy</button>
+        </div>
+        <div class="channel">
+          <div class="ch-label"><span class="ch-num">06</span><span class="ch-name">Braille</span></div>
+          <div class="ch-output empty braille" id="out-braille">—</div>
+          <button class="copy-btn" data-target="out-braille">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DECODE PANEL -->
+  <div id="decode-panel" class="hidden">
+    <div class="panel">
+      <div class="decode-grid">
+        <div class="decode-row">
+          <label class="field-label" for="decode-format">Source format</label>
+          <select id="decode-format">
+            <option value="ascii">ASCII</option>
+            <option value="binary">Binary</option>
+            <option value="hex">Hex</option>
+            <option value="base64">Base64</option>
+            <option value="morse">Morse</option>
+            <option value="braille">Braille</option>
+          </select>
+        </div>
+        <div class="decode-row">
+          <label class="field-label" for="decode-input">Encoded input</label>
+          <textarea id="decode-input" style="min-height:80px" placeholder="Paste an encoded message..."></textarea>
+          <div class="decode-error" id="decode-error">Couldn't decode that — check the format matches the input.</div>
+        </div>
+        <div class="decode-row">
+          <label class="field-label" for="decode-output">Decoded message</label>
+          <textarea id="decode-output" readonly></textarea>
+        </div>
+        <div>
+          <button class="copy-btn" data-target="decode-output">Copy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Wire Room · a text transcoder</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- Byte helpers ---------------- */
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  function toBytes(str){ return enc.encode(str); }
+  function fromBytes(bytes){ return dec.decode(bytes); }
+
+  /* ---------------- ASCII ---------------- */
+  function encodeAscii(text){
+    return Array.from(text).map(ch => ch.codePointAt(0)).join(' ');
+  }
+  function decodeAscii(str){
+    const parts = str.trim().split(/\s+/).filter(Boolean);
+    return parts.map(p => {
+      const n = Number(p);
+      if(!Number.isFinite(n)) throw new Error('bad ascii token');
+      return String.fromCodePoint(n);
+    }).join('');
+  }
+
+  /* ---------------- Binary ---------------- */
+  function encodeBinary(text){
+    return Array.from(toBytes(text)).map(b => b.toString(2).padStart(8,'0')).join(' ');
+  }
+  function decodeBinary(str){
+    const parts = str.trim().split(/\s+/).filter(Boolean);
+    const bytes = new Uint8Array(parts.map(p => {
+      if(!/^[01]{1,8}$/.test(p)) throw new Error('bad binary token');
+      return parseInt(p,2);
+    }));
+    return fromBytes(bytes);
+  }
+
+  /* ---------------- Hex ---------------- */
+  function encodeHex(text){
+    return Array.from(toBytes(text)).map(b => b.toString(16).padStart(2,'0')).join(' ');
+  }
+  function decodeHex(str){
+    const clean = str.trim().replace(/0x/gi,'');
+    const parts = clean.split(/[\s,]+/).filter(Boolean);
+    const bytes = new Uint8Array(parts.map(p => {
+      if(!/^[0-9a-fA-F]{1,2}$/.test(p)) throw new Error('bad hex token');
+      return parseInt(p,16);
+    }));
+    return fromBytes(bytes);
+  }
+
+  /* ---------------- Base64 ---------------- */
+  function encodeBase64(text){
+    const bytes = toBytes(text);
+    let bin = '';
+    bytes.forEach(b => bin += String.fromCharCode(b));
+    return btoa(bin);
+  }
+  function decodeBase64(str){
+    const bin = atob(str.trim());
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return fromBytes(bytes);
+  }
+
+  /* ---------------- Morse ---------------- */
+  const MORSE_MAP = {
+    A:'.-', B:'-...', C:'-.-.', D:'-..', E:'.', F:'..-.', G:'--.', H:'....',
+    I:'..', J:'.---', K:'-.-', L:'.-..', M:'--', N:'-.', O:'---', P:'.--.',
+    Q:'--.-', R:'.-.', S:'...', T:'-', U:'..-', V:'...-', W:'.--', X:'-..-',
+    Y:'-.--', Z:'--..',
+    '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-',
+    '5':'.....','6':'-....','7':'--...','8':'---..','9':'----.',
+    '.':'.-.-.-', ',':'--..--', '?':'..--..', "'":'.----.', '!':'-.-.--',
+    '/':'-..-.', '(':'-.--.', ')':'-.--.-', '&':'.-...', ':':'---...',
+    ';':'-.-.-.', '=':'-...-', '+':'.-.-.', '-':'-....-', '_':'..--.-',
+    '"':'.-..-.', '$':'...-..-', '@':'.--.-.'
+  };
+  const MORSE_REV = Object.fromEntries(Object.entries(MORSE_MAP).map(([k,v])=>[v,k]));
+
+  function encodeMorse(text){
+    return text.toUpperCase().split(' ').map(word =>
+      Array.from(word).map(ch => MORSE_MAP[ch] || ch).join(' ')
+    ).join(' / ');
+  }
+  function decodeMorse(str){
+    return str.trim().split('/').map(word =>
+      word.trim().split(/\s+/).filter(Boolean).map(tok => MORSE_REV[tok] ?? '').join('')
+    ).join(' ');
+  }
+
+  /* ---------------- Braille (Grade 1, uncontracted) ---------------- */
+  const BRAILLE_LETTERS = {
+    a:'⠁', b:'⠃', c:'⠉', d:'⠙', e:'⠑', f:'⠋', g:'⠛', h:'⠓', i:'⠊', j:'⠚',
+    k:'⠅', l:'⠇', m:'⠍', n:'⠝', o:'⠕', p:'⠏', q:'⠟', r:'⠗', s:'⠎', t:'⠞',
+    u:'⠥', v:'⠧', w:'⠺', x:'⠭', y:'⠽', z:'⠵'
+  };
+  const BRAILLE_DIGITS = { '1':'⠁','2':'⠃','3':'⠉','4':'⠙','5':'⠑','6':'⠋','7':'⠛','8':'⠓','9':'⠊','0':'⠚' };
+  const BRAILLE_PUNCT = { ',':'⠂', ';':'⠆', ':':'⠒', '.':'⠲', '!':'⠖', '?':'⠦', "'":'⠄', '-':'⠤' };
+  const CAPITAL_SIGN = '⠠';
+  const NUMBER_SIGN = '⠼';
+
+  const BRAILLE_LETTERS_REV = Object.fromEntries(Object.entries(BRAILLE_LETTERS).map(([k,v])=>[v,k]));
+  const BRAILLE_DIGITS_REV = Object.fromEntries(Object.entries(BRAILLE_DIGITS).map(([k,v])=>[v,k]));
+  const BRAILLE_PUNCT_REV = Object.fromEntries(Object.entries(BRAILLE_PUNCT).map(([k,v])=>[v,k]));
+
+  function encodeBraille(text){
+    let out = '';
+    for(const ch of text){
+      if(ch === ' '){ out += ' '; continue; }
+      if(/[0-9]/.test(ch)){ out += NUMBER_SIGN + BRAILLE_DIGITS[ch]; continue; }
+      if(/[A-Z]/.test(ch)){ out += CAPITAL_SIGN + BRAILLE_LETTERS[ch.toLowerCase()]; continue; }
+      if(/[a-z]/.test(ch)){ out += BRAILLE_LETTERS[ch]; continue; }
+      if(BRAILLE_PUNCT[ch]){ out += BRAILLE_PUNCT[ch]; continue; }
+      out += ch; // passthrough for anything unmapped
+    }
+    return out;
+  }
+  function decodeBraille(str){
+    let out = '';
+    let capitalNext = false;
+    let numberMode = false;
+    for(const ch of str){
+      if(ch === CAPITAL_SIGN){ capitalNext = true; continue; }
+      if(ch === NUMBER_SIGN){ numberMode = true; continue; }
+      if(ch === ' '){ out += ' '; numberMode = false; capitalNext = false; continue; }
+      if(numberMode && BRAILLE_DIGITS_REV[ch]){ out += BRAILLE_DIGITS_REV[ch]; continue; }
+      if(BRAILLE_LETTERS_REV[ch]){
+        let letter = BRAILLE_LETTERS_REV[ch];
+        if(capitalNext){ letter = letter.toUpperCase(); capitalNext = false; }
+        out += letter;
+        numberMode = false;
+        continue;
+      }
+      if(BRAILLE_PUNCT_REV[ch]){ out += BRAILLE_PUNCT_REV[ch]; numberMode = false; continue; }
+      out += ch; // passthrough
+    }
+    return out;
+  }
+
+  /* ---------------- Encode panel wiring ---------------- */
+  const input = document.getElementById('input-text');
+  const charCount = document.getElementById('char-count');
+  const outs = {
+    ascii: document.getElementById('out-ascii'),
+    binary: document.getElementById('out-binary'),
+    hex: document.getElementById('out-hex'),
+    base64: document.getElementById('out-base64'),
+    morse: document.getElementById('out-morse'),
+    braille: document.getElementById('out-braille'),
+  };
+
+  function setOutput(el, value){
+    if(value === ''){
+      el.textContent = '—';
+      el.classList.add('empty');
+    } else {
+      el.textContent = value;
+      el.classList.remove('empty');
+    }
+  }
+
+  function renderEncode(){
+    const text = input.value;
+    charCount.textContent = Array.from(text).length;
+    setOutput(outs.ascii, text ? encodeAscii(text) : '');
+    setOutput(outs.binary, text ? encodeBinary(text) : '');
+    setOutput(outs.hex, text ? encodeHex(text) : '');
+    setOutput(outs.base64, text ? encodeBase64(text) : '');
+    setOutput(outs.morse, text ? encodeMorse(text) : '');
+    setOutput(outs.braille, text ? encodeBraille(text) : '');
+    renderTape(text);
+  }
+
+  input.addEventListener('input', renderEncode);
+
+  /* ---------------- Punch tape ---------------- */
+  const tapeRow = document.getElementById('tape-row');
+  const TAPE_COLS = 46;
+
+  function buildTapeSkeleton(){
+    tapeRow.innerHTML = '';
+    for(let c=0;c<TAPE_COLS;c++){
+      const col = document.createElement('div');
+      col.className = 'tape-col';
+      // sprocket + 5 data holes + sprocket, sprocket sits at row index 2 visually via CSS lines
+      const holes = [];
+      for(let r=0;r<5;r++){
+        const h = document.createElement('div');
+        h.className = 'hole';
+        col.appendChild(h);
+        holes.push(h);
+        if(r === 1){
+          const spr = document.createElement('div');
+          spr.className = 'sprocket';
+          col.appendChild(spr);
+        }
+      }
+      tapeRow.appendChild(col);
+      col._holes = holes;
+    }
+  }
+  buildTapeSkeleton();
+
+  function renderTape(text){
+    const cols = tapeRow.children;
+    const chars = Array.from(text.replace(/\s+/g,' ').trim());
+    for(let i=0;i<TAPE_COLS;i++){
+      const col = cols[i];
+      const holes = col._holes;
+      let bits = 0;
+      if(chars.length){
+        const ch = chars[i % chars.length];
+        bits = ch.codePointAt(0) & 0b11111;
+      }
+      for(let r=0;r<5;r++){
+        const on = chars.length ? ((bits >> r) & 1) === 1 : false;
+        holes[r].classList.toggle('filled', on);
+      }
+    }
+  }
+  renderTape('');
+
+  /* ---------------- Mode toggle ---------------- */
+  const btnEncode = document.getElementById('btn-encode');
+  const btnDecode = document.getElementById('btn-decode');
+  const encodePanel = document.getElementById('encode-panel');
+  const decodePanel = document.getElementById('decode-panel');
+
+  btnEncode.addEventListener('click', () => {
+    btnEncode.classList.add('active'); btnEncode.setAttribute('aria-selected','true');
+    btnDecode.classList.remove('active'); btnDecode.setAttribute('aria-selected','false');
+    encodePanel.classList.remove('hidden');
+    decodePanel.classList.add('hidden');
+  });
+  btnDecode.addEventListener('click', () => {
+    btnDecode.classList.add('active'); btnDecode.setAttribute('aria-selected','true');
+    btnEncode.classList.remove('active'); btnEncode.setAttribute('aria-selected','false');
+    decodePanel.classList.remove('hidden');
+    encodePanel.classList.add('hidden');
+  });
+
+  /* ---------------- Decode panel wiring ---------------- */
+  const decodeFormat = document.getElementById('decode-format');
+  const decodeInput = document.getElementById('decode-input');
+  const decodeOutput = document.getElementById('decode-output');
+  const decodeError = document.getElementById('decode-error');
+
+  const DECODERS = {
+    ascii: decodeAscii,
+    binary: decodeBinary,
+    hex: decodeHex,
+    base64: decodeBase64,
+    morse: decodeMorse,
+    braille: decodeBraille,
+  };
+
+  function renderDecode(){
+    const fmt = decodeFormat.value;
+    const val = decodeInput.value;
+    if(!val.trim()){
+      decodeOutput.value = '';
+      decodeError.classList.remove('show');
+      return;
+    }
+    try{
+      decodeOutput.value = DECODERS[fmt](val);
+      decodeError.classList.remove('show');
+    }catch(e){
+      decodeOutput.value = '';
+      decodeError.classList.add('show');
+    }
+  }
+  decodeInput.addEventListener('input', renderDecode);
+  decodeFormat.addEventListener('change', renderDecode);
+
+  /* ---------------- Copy buttons ---------------- */
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.copy-btn');
+    if(!btn) return;
+    const targetId = btn.getAttribute('data-target');
+    const el = document.getElementById(targetId);
+    const text = (el.tagName === 'TEXTAREA') ? el.value : el.textContent;
+    if(!text || text === '—') return;
+    navigator.clipboard.writeText(text).then(() => {
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1200);
+    }).catch(() => {});
+  });
+
+  /* ---------------- Init ---------------- */
+  renderEncode();
+})();
+</script>
+
+</body>
+</html>
